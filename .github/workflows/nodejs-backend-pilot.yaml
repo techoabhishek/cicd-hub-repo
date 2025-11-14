@@ -1,14 +1,10 @@
-# Hub: reusable workflow for pilot validations
-# Lightweight: prints context, lists files, shows package.json if present, and does a docker build smoke test if Dockerfile exists.
+# Hub: reusable workflow for pilot validations (no secrets)
 on:
   workflow_call:
     inputs:
       service_name:
         type: string
         required: false
-    secrets:
-      GITHUB_TOKEN:
-        required: true
 
 jobs:
   pilot-validate:
@@ -16,50 +12,46 @@ jobs:
     steps:
       - name: Show workflow context
         run: |
-          echo "Running hub reusable workflow: nodejs-backend-pilot"
+          echo "Running HUB reusable workflow: nodejs-backend-pilot"
           echo "Called by repo: ${{ github.repository }}"
           echo "Called by ref:  ${{ github.ref }}"
-          echo "Service name input: ${{ inputs.service_name }}"
+          echo "Service name:   ${{ inputs.service_name }}"
 
       - name: Checkout caller repo
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
 
-      - name: List repository files (root)
+      - name: List repository files
         run: |
-          echo "Files at repo root:"
+          echo "Files in repo:"
           ls -la
 
-      - name: Show package.json if present
+      - name: Print package.json if exists
         run: |
           if [ -f package.json ]; then
-            echo "Found package.json -- printing first 200 lines:"
-            sed -n '1,200p' package.json || true
+            echo "package.json found:"
+            cat package.json
           else
-            echo "No package.json found in repo root."
+            echo "No package.json found."
           fi
 
-      - name: Show Dockerfile if present
+      - name: Print Dockerfile if exists
         run: |
           if [ -f Dockerfile ]; then
-            echo "Found Dockerfile -- printing it:"
-            sed -n '1,200p' Dockerfile || true
+            echo "Dockerfile found:"
+            cat Dockerfile
           else
-            echo "No Dockerfile found in repo root."
+            echo "No Dockerfile found."
           fi
 
-      - name: Docker build smoke test (if Dockerfile present)
+      - name: Docker build smoke test
         run: |
           if [ -f Dockerfile ]; then
-            IMAGE="pilot-smoke:${GITHUB_SHA::7}"
-            echo "Building docker image $IMAGE (this is local to runner, not pushed)"
-            docker build -t "$IMAGE" .
-            echo "Docker build finished."
+            echo "Running local docker build smoke test..."
+            docker build -t pilot-test:${GITHUB_SHA::7} .
+            echo "Docker build completed successfully."
           else
-            echo "Skipping docker build - no Dockerfile."
+            echo "Skipping docker build (no Dockerfile)."
           fi
 
-      - name: Final echo
-        run: |
-          echo "Hub pilot validation finished for ${{ inputs.service_name }}"
+      - name: End message
+        run: echo "Hub pipeline execution completed successfully."
