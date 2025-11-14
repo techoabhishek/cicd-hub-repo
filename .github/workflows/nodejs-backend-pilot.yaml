@@ -1,0 +1,75 @@
+# hub: reusable workflow (nodejs-backend-pilot)
+# Purpose: light-weight validation steps for pilot: lint (if present), test (if present), docker build smoke
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        type: string
+        required: false
+    secrets:
+      # caller repo must pass/inherit secrets if required
+      GITHUB_TOKEN:
+        required: true
+
+jobs:
+  pilot-validate:
+    runs-on: ubuntu-latest
+    outputs:
+      docker_built: ${{ steps.docker_build.outputs.built }}
+    steps:
+      - name: Show context
+        run: |
+          echo "Running reusable hub workflow: nodejs-backend-pilot"
+          echo "Caller repo: ${{ github.repository }}"     # shows spoke repo when called
+          echo "Caller ref: ${{ github.ref }}"
+
+      - name: Checkout caller repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js (if package.json exists)
+        if: filesExist('package.json')
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies (if package.json exists)
+        if: filesExist('package.json')
+        run: |
+          npm ci
+
+      - name: Run lint if script exists
+        if: |
+          filesExist('package.json') && contains(fromJSON(run('cat package.json')), 'lint')
+        shell: bash
+        run: |
+          # run lint if there is a lint script; fail if lint fails
+          jq -e '.scripts.lint' package.json >/dev/null 2>&1 || exit 78
+          npm run lint
+
+      - name: Run tests if script exists
+        if: |
+          filesExist('package.json') && contains(fromJSON(run('cat package.json')), 'test')
+        shell: bash
+        run: |
+          jq -e '.scripts.test' package.json >/dev/null 2>&1 || exit 78
+          npm test
+
+      - name: Docker build smoke test
+        id: docker_build
+        run: |
+          if [ -f Dockerfile ]; then
+            IMAGE="pilot-smoke:${GITHUB_SHA::7}"
+            echo "Building docker image $IMAGE"
+            docker build -t "$IMAGE" .
+            # mark as built
+            echo "::set-output name=built::true"
+          else
+            echo "No Dockerfile found — skipping docker build"
+            echo "::set-output name=built::false"
+          fi
+
+      - name: Final status
+        run: |
+          echo "Docker built: ${{ steps.docker_build.outputs.built }}"
