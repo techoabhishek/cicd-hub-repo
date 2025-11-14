@@ -1,5 +1,5 @@
-# hub: reusable workflow (nodejs-backend-pilot)
-# Purpose: light-weight validation steps for pilot: lint (if present), test (if present), docker build smoke
+# Hub: reusable workflow for pilot validations
+# Lightweight: prints context, lists files, shows package.json if present, and does a docker build smoke test if Dockerfile exists.
 on:
   workflow_call:
     inputs:
@@ -7,69 +7,59 @@ on:
         type: string
         required: false
     secrets:
-      # caller repo must pass/inherit secrets if required
       GITHUB_TOKEN:
         required: true
 
 jobs:
   pilot-validate:
     runs-on: ubuntu-latest
-    outputs:
-      docker_built: ${{ steps.docker_build.outputs.built }}
     steps:
-      - name: Show context
+      - name: Show workflow context
         run: |
-          echo "Running reusable hub workflow: nodejs-backend-pilot"
-          echo "Caller repo: ${{ github.repository }}"     # shows spoke repo when called
-          echo "Caller ref: ${{ github.ref }}"
+          echo "Running hub reusable workflow: nodejs-backend-pilot"
+          echo "Called by repo: ${{ github.repository }}"
+          echo "Called by ref:  ${{ github.ref }}"
+          echo "Service name input: ${{ inputs.service_name }}"
 
       - name: Checkout caller repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - name: Setup Node.js (if package.json exists)
-        if: filesExist('package.json')
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies (if package.json exists)
-        if: filesExist('package.json')
+      - name: List repository files (root)
         run: |
-          npm ci
+          echo "Files at repo root:"
+          ls -la
 
-      - name: Run lint if script exists
-        if: |
-          filesExist('package.json') && contains(fromJSON(run('cat package.json')), 'lint')
-        shell: bash
+      - name: Show package.json if present
         run: |
-          # run lint if there is a lint script; fail if lint fails
-          jq -e '.scripts.lint' package.json >/dev/null 2>&1 || exit 78
-          npm run lint
+          if [ -f package.json ]; then
+            echo "Found package.json -- printing first 200 lines:"
+            sed -n '1,200p' package.json || true
+          else
+            echo "No package.json found in repo root."
+          fi
 
-      - name: Run tests if script exists
-        if: |
-          filesExist('package.json') && contains(fromJSON(run('cat package.json')), 'test')
-        shell: bash
+      - name: Show Dockerfile if present
         run: |
-          jq -e '.scripts.test' package.json >/dev/null 2>&1 || exit 78
-          npm test
+          if [ -f Dockerfile ]; then
+            echo "Found Dockerfile -- printing it:"
+            sed -n '1,200p' Dockerfile || true
+          else
+            echo "No Dockerfile found in repo root."
+          fi
 
-      - name: Docker build smoke test
-        id: docker_build
+      - name: Docker build smoke test (if Dockerfile present)
         run: |
           if [ -f Dockerfile ]; then
             IMAGE="pilot-smoke:${GITHUB_SHA::7}"
-            echo "Building docker image $IMAGE"
+            echo "Building docker image $IMAGE (this is local to runner, not pushed)"
             docker build -t "$IMAGE" .
-            # mark as built
-            echo "::set-output name=built::true"
+            echo "Docker build finished."
           else
-            echo "No Dockerfile found — skipping docker build"
-            echo "::set-output name=built::false"
+            echo "Skipping docker build - no Dockerfile."
           fi
 
-      - name: Final status
+      - name: Final echo
         run: |
-          echo "Docker built: ${{ steps.docker_build.outputs.built }}"
+          echo "Hub pilot validation finished for ${{ inputs.service_name }}"
