@@ -1,0 +1,119 @@
+# Hub reusable workflow: Build Docker image from specified folder, push to Artifact Registry, deploy to Cloud Run.
+
+# Inputs:
+#  - service_dir (path in caller repo to app, e.g. sample-node-app)
+#  - project_id, region, image_repo (artifact registry repo name), service_name
+#  - cloudrun_allow_unauth: "true" or "false" (defaults to "false")
+#
+on:
+  workflow_call:
+    inputs:
+      service_dir:
+        required: true
+        type: string
+      project_id:
+        required: true
+        type: string
+      region:
+        required: true
+        type: string
+      image_repo:
+        required: true
+        type: string
+      service_name:
+        required: true
+        type: string
+    secrets:
+      STAGING_GCP_CREDENTIALS:
+        required: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show inputs
+        run: |
+          echo "Inputs:"
+          echo "service_dir=${{ inputs.service_dir }}"
+          echo "project_id=${{ inputs.project_id }}"
+          echo "region=${{ inputs.region }}"
+          echo "image_repo=${{ inputs.image_repo }}"
+          echo "service_name=${{ inputs.service_name }}"
+
+      - name: Checkout caller repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Ensure service directory exists
+        run: |
+          if [ ! -d "${{ inputs.service_dir }}" ]; then
+            echo "ERROR: service_dir '${{ inputs.service_dir }}' not found."
+            ls -la
+            exit 1
+          fi
+
+      - name: Change to service directory
+        run: |
+          cd "${{ inputs.service_dir }}"
+          echo "Now in: $(pwd)"
+        shell: bash
+
+      - name: Install dependencies if package.json exists
+        run: |
+          cd "${{ inputs.service_dir }}"
+          if [ -f package.json ]; then
+            echo "Installing npm dependencies..."
+            npm install --omit=dev || true
+          else
+            echo "No package.json found — skipping npm install."
+          fi
+      
+      - name: Running tests if test script exists
+        run: |
+          cd "${{ inputs.service_dir }}"
+          if [ -f package.json ] && grep -q '"test":' package.json; then
+            echo "Running npm test..."
+            npm test || true
+          else
+            echo "No test script found in package.json — skipping tests."
+          fi
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/864610185638/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
+          service_account: "github-action-cicd@prj-vonage-apigee-poc.iam.gserviceaccount.com"
+
+      - name: Configure gcloud project
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ inputs.project_id }}
+          install_components: "beta"
+      
+      - name: Configure Docker auth for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ inputs.region }}-docker.pkg.dev --quiet
+
+      - name: Build & push Docker image to Artifact Registry
+        id: build_push
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ inputs.service_dir }}
+          push: true
+          tags: ${{ inputs.region }}-docker.pkg.dev/${{ inputs.project_id }}/${{ inputs.image_repo }}/${{ inputs.service_name }}:${{ github.sha }}
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v1
+        with:
+          project_id: ${{ inputs.project_id }}
+          service: ${{ inputs.service_name }}
+          image: ${{ inputs.region }}-docker.pkg.dev/${{ inputs.project_id }}/${{ inputs.image_repo }}/${{ inputs.service_name }}:${{ github.sha }}
+          region: ${{ inputs.region }}
+          allow_unauthenticated: ${{ inputs.cloudrun_allow_unauth }}
+          args: "--platform managed"
+
+      - name: Output service URL
+        run: |
+          SERVICE_URL=$(gcloud run services describe "${{ inputs.service_name }}" --project="${{ inputs.project_id }}" --region="${{ inputs.region }}" --format='value(status.url)')
+          echo "Cloud Run URL: ${SERVICE_URL}"
