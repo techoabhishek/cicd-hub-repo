@@ -8,19 +8,7 @@
 on:
   workflow_call:
     inputs:
-      service_dir:
-        required: true
-        type: string
-      project_id:
-        required: true
-        type: string
-      region:
-        required: true
-        type: string
-      image_repo:
-        required: true
-        type: string
-      service_name:
+      app_config_path:
         required: true
         type: string
 
