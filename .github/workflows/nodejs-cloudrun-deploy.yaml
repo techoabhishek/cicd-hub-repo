@@ -23,9 +23,6 @@ on:
       service_name:
         required: true
         type: string
-    secrets:
-      STAGING_GCP_CREDENTIALS:
-        required: true
 
 jobs:
   build-and-deploy:
