@@ -89,7 +89,6 @@ jobs:
         uses: google-github-actions/setup-gcloud@v1
         with:
           project_id: ${{ inputs.project_id }}
-          install_components: "beta"
       
       - name: Configure Docker auth for Artifact Registry
         run: |
