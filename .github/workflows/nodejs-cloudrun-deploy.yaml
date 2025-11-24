@@ -120,7 +120,7 @@ jobs:
           echo "Cloud Run URL: ${SERVICE_URL}"
 
 
-  post-deploy-notification:
+  post-deploy-notification-frm-hub:
     runs-on: ubuntu-latest
     needs: [build-and-deploy]
     if: always()
