@@ -1,0 +1,75 @@
+name: 'Enterprise Slack Notification'
+description: 'Sends production-grade notifications to Slack based on job status'
+inputs:
+  status:
+    description: 'Job status (success, failure, cancelled)'
+    required: true
+  slack_webhook:
+    description: 'The Slack Webhook URL'
+    required: true
+  job_name:
+    description: 'Name of the Job being executed'
+    required: false
+    default: 'CI/CD Pipeline'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Send Notification
+      shell: bash
+      env:
+        SLACK_WEBHOOK: ${{ inputs.slack_webhook }}
+        STATUS: ${{ inputs.status }}
+        JOB_NAME: ${{ inputs.job_name }}
+      run: |
+        # 1. Determine Color and Emoji based on Status
+        if [ "$STATUS" == "success" ]; then
+          COLOR="#36a64f" # Green
+          EMOJI=":white_check_mark:"
+          HEADER="Build Succeeded"
+        elif [ "$STATUS" == "failure" ]; then
+          COLOR="#dc3545" # Red
+          EMOJI=":x:"
+          HEADER="Build Failed"
+        else
+          COLOR="#808080" # Gray
+          EMOJI=":dob:"
+          HEADER="Build Cancelled"
+        fi
+
+        # 2. Get Git Details
+        REPO_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+        COMMIT_URL="$REPO_URL/commit/$GITHUB_SHA"
+        RUN_URL="$REPO_URL/actions/runs/$GITHUB_RUN_ID"
+        AUTHOR="$GITHUB_ACTOR"
+        BRANCH="${GITHUB_REF#refs/heads/}"
+        # Safe Git Log (handles shallow clones if necessary)
+        MESSAGE=$(git log -1 --pretty=format:"%s" || echo "No commit message found")
+
+        # 3. Construct JSON Payload
+        PAYLOAD=$(cat <<EOF
+        {
+          "attachments": [
+            {
+              "color": "$COLOR",
+              "pretext": "$EMOJI *${JOB_NAME}* - $HEADER",
+              "fields": [
+                { "title": "Repository", "value": "<$REPO_URL|$GITHUB_REPOSITORY>", "short": true },
+                { "title": "Branch", "value": "\`$BRANCH\`", "short": true },
+                { "title": "Commit", "value": "<$COMMIT_URL|$(echo $GITHUB_SHA | cut -c1-7)> - $MESSAGE", "short": false },
+                { "title": "Triggered By", "value": "$AUTHOR", "short": true },
+                { "title": "Status", "value": "$STATUS", "short": true }
+              ],
+              "actions": [
+                { "type": "button", "text": "View Logs", "url": "$RUN_URL", "style": "primary" }
+              ],
+              "footer": "GitHub Actions | Hub & Spoke",
+              "ts": $(date +%s)
+            }
+          ]
+        }
+        EOF
+        )
+
+        # 4. Send Request
+        curl -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK"
