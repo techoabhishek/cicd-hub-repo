@@ -23,6 +23,11 @@ on:
       service_name:
         required: true
         type: string
+      environment:
+        description: 'The GitHub Environment to deploy to (e.g., production)'
+        required: false
+        type: string
+        default: ''
 
 jobs:
   build-and-deploy:
