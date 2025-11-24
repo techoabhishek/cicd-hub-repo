@@ -126,4 +126,4 @@ jobs:
           # This grabs the result ('success', 'failure', 'cancelled') from the previous job
           status: ${{ needs.build-and-deploy.result }}
           slack_webhook: ${{ secrets.SLACK_WEBHOOK }}
-          job_name: "Spoke Deploy - sample-node-app"
+          job_name: "Deploy: ${{ github.repository }}"
