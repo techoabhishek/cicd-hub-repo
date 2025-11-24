@@ -1,8 +1,8 @@
-name: 'Slack Notification'
-description: 'Send Notifications to Slack based on job status'
+name: 'Enterprise Slack Notification'
+description: 'Smart notifications with Mentions and Approval links'
 inputs:
   status:
-    description: 'Job status (success, failure, cancelled)'
+    description: 'Job status (success, failure, cancelled, approval)'
     required: true
   slack_webhook:
     description: 'The Slack Webhook URL'
@@ -11,6 +11,11 @@ inputs:
     description: 'Name of the Job being executed'
     required: false
     default: 'CI/CD Pipeline'
+  # NEW INPUT: Who to tag on failure? (e.g., <!here>, <!channel>, or <@U123456>)
+  mention_on_failure:
+    description: 'Slack ID or Group to mention on failure'
+    required: false
+    default: '<!here>' 
 
 runs:
   using: "composite"
@@ -21,49 +26,71 @@ runs:
         SLACK_WEBHOOK: ${{ inputs.slack_webhook }}
         STATUS: ${{ inputs.status }}
         JOB_NAME: ${{ inputs.job_name }}
+        MENTION: ${{ inputs.mention_on_failure }}
       run: |
-        # 1. Determine Color and Emoji based on Status
+        # 1. Logic for Colors, Emojis, and Mentions
+        MENTION_TEXT=""
+        BUTTON_TEXT="View Logs"
+        BUTTON_STYLE="primary"
+        
         if [ "$STATUS" == "success" ]; then
           COLOR="#36a64f" # Green
           EMOJI=":white_check_mark:"
           HEADER="Build Succeeded"
+          
         elif [ "$STATUS" == "failure" ]; then
           COLOR="#dc3545" # Red
           EMOJI=":x:"
           HEADER="Build Failed"
+          # Only mention people if it fails
+          MENTION_TEXT="$MENTION " 
+          BUTTON_STYLE="danger"
+          
+        elif [ "$STATUS" == "approval" ]; then
+          COLOR="#ffc107" # Amber/Yellow
+          EMOJI=":raised_hand:"
+          HEADER="Approval Required"
+          BUTTON_TEXT="Review & Approve"
+          # Mentions for approvals are usually good too
+          MENTION_TEXT="$MENTION "
+          
         else
           COLOR="#808080" # Gray
           EMOJI=":dob:"
           HEADER="Build Cancelled"
         fi
 
-        # 2. Get Git Details
+        # 2. Git Metadata
         REPO_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
-        COMMIT_URL="$REPO_URL/commit/$GITHUB_SHA"
         RUN_URL="$REPO_URL/actions/runs/$GITHUB_RUN_ID"
+        COMMIT_URL="$REPO_URL/commit/$GITHUB_SHA"
         AUTHOR="$GITHUB_ACTOR"
         BRANCH="${GITHUB_REF#refs/heads/}"
-        # Safe Git Log (handles shallow clones if necessary)
-        MESSAGE=$(git log -1 --pretty=format:"%s" || echo "No commit message found")
+        MESSAGE=$(git log -1 --pretty=format:"%s" || echo "No commit message")
 
-        # 3. Construct JSON Payload
+        # 3. Construct Payload
+        # We prepend MENTION_TEXT to the pretext so it triggers a notification
         PAYLOAD=$(cat <<EOF
         {
           "attachments": [
             {
               "color": "$COLOR",
-              "pretext": "$EMOJI *${JOB_NAME}* - $HEADER",
+              "pretext": "$MENTION_TEXT $EMOJI *${JOB_NAME}* - $HEADER",
               "fields": [
-                { "title": "Repository", "value": "<$REPO_URL|$GITHUB_REPOSITORY>", "short": true },
-                { "title": "Branch", "value": "\`$BRANCH\`", "short": true },
-                { "title": "Commit", "value": "<$COMMIT_URL|$(echo $GITHUB_SHA | cut -c1-7)> - $MESSAGE", "short": false },
-                { "title": "Triggered By", "value": "$AUTHOR", "short": true },
-                { "title": "Status", "value": "$STATUS", "short": true }
+                { "title": "Repo", "value": "<$REPO_URL|$GITHUB_REPOSITORY>", "short": true },
+                { "title": "Ref", "value": "\`$BRANCH\`", "short": true },
+                { "title": "Commit", "value": "<$COMMIT_URL|$(echo $GITHUB_SHA | cut -c1-7)>: $MESSAGE", "short": false },
+                { "title": "Actor", "value": "$AUTHOR", "short": true }
               ],
               "actions": [
-                { "type": "button", "text": "View Logs", "url": "$RUN_URL", "style": "primary" }
+                {
+                  "type": "button",
+                  "text": "$BUTTON_TEXT",
+                  "url": "$RUN_URL",
+                  "style": "$BUTTON_STYLE"
+                }
               ],
-              "footer": "GitHub Actions | Hub & Spoke",
+              "footer": "Enterprise CI/CD Hub",
               "ts": $(date +%s)
             }
           ]
@@ -71,5 +98,4 @@ runs:
         EOF
         )
 
-        # 4. Send Request
         curl -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK"
