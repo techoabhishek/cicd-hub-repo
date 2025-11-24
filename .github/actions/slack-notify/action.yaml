@@ -1,5 +1,5 @@
-name: 'Enterprise Slack Notification'
-description: 'Sends production-grade notifications to Slack based on job status'
+name: 'Slack Notification'
+description: 'Send Notifications to Slack based on job status'
 inputs:
   status:
     description: 'Job status (success, failure, cancelled)'

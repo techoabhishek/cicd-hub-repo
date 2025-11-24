@@ -113,3 +113,17 @@ jobs:
         run: |
           SERVICE_URL=$(gcloud run services describe "${{ inputs.service_name }}" --project="${{ inputs.project_id }}" --region="${{ inputs.region }}" --format='value(status.url)')
           echo "Cloud Run URL: ${SERVICE_URL}"
+
+
+  post-deploy-notification:
+    runs-on: ubuntu-latest
+    needs: [build-and-deploy]
+    if: always()
+    steps:
+      - name: Slack Notification
+        uses: .github/actions/slack-notify@main
+        with:
+          # This grabs the result ('success', 'failure', 'cancelled') from the previous job
+          status: ${{ needs.build-and-deploy.result }}
+          slack_webhook: ${{ secrets.SLACK_WEBHOOK }}
+          job_name: "Spoke Deploy - sample-node-app"
