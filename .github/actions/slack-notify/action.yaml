@@ -1,5 +1,5 @@
-name: 'Enterprise Slack Notification'
-description: 'Smart notifications with Mentions and Approval links'
+name: 'Slack Notification'
+description: 'Notifications with Mentions and Approval links'
 inputs:
   status:
     description: 'Job status (success, failure, cancelled, approval)'
@@ -11,7 +11,6 @@ inputs:
     description: 'Name of the Job being executed'
     required: false
     default: 'CI/CD Pipeline'
-  # NEW INPUT: Who to tag on failure? (e.g., <!here>, <!channel>, or <@U123456>)
   mention_on_failure:
     description: 'Slack ID or Group to mention on failure'
     required: false
@@ -90,7 +89,7 @@ runs:
                   "style": "$BUTTON_STYLE"
                 }
               ],
-              "footer": "Enterprise CI/CD Hub",
+              "footer": "Vonage Enterprise CI/CD Hub",
               "ts": $(date +%s)
             }
           ]
