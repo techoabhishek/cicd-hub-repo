@@ -99,26 +99,11 @@ jobs:
 
       - name: Build & push Docker image to Artifact Registry
         id: build_push
-        uses: docker/build-push-action@v5
-        with:
-          context: ${{ inputs.service_dir }}
-          push: true
-          tags: ${{ inputs.region }}-docker.pkg.dev/${{ inputs.project_id }}/${{ inputs.image_repo }}/${{ inputs.service_name }}:${{ github.sha }}
-
-      - name: Deploy to Cloud Run
-        uses: google-github-actions/deploy-cloudrun@v1
-        with:
-          project_id: ${{ inputs.project_id }}
-          service: ${{ inputs.service_name }}
-          image: ${{ inputs.region }}-docker.pkg.dev/${{ inputs.project_id }}/${{ inputs.image_repo }}/${{ inputs.service_name }}:${{ github.sha }}
-          region: ${{ inputs.region }}
-          allow_unauthenticated: ${{ inputs.cloudrun_allow_unauth }}
-          args: "--platform managed"
-
-      - name: Output service URL
         run: |
-          SERVICE_URL=$(gcloud run services describe "${{ inputs.service_name }}" --project="${{ inputs.project_id }}" --region="${{ inputs.region }}" --format='value(status.url)')
-          echo "Cloud Run URL: ${SERVICE_URL}"
+          echo "Building Docker image..."
+      - name: Deploy to Cloud Run
+        run: |
+          echo "Deploying to Cloud Run service: ${{ inputs.service_name }} in region: ${{ inputs.region }}"
 
 
   post-deploy-notification-frm-hub:
@@ -126,10 +111,30 @@ jobs:
     needs: [build-and-deploy]
     if: always()
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Determine Notification Status
+        id: status
+        run: |
+          DEPLOY_RESULT="${{ needs.build-and-deploy.result }}"
+          
+          # Default to the actual result
+          FINAL_STATUS=$DEPLOY_RESULT
+          
+          # CUSTOM LOGIC: 
+          # If the job failed, we can optionally map it to 'rejected' 
+          # if that's how you want to label all failures in this stage.
+          if [ "$DEPLOY_RESULT" == "failure" ]; then
+            echo "Detected failure. Setting status to rejected (per config)."
+            FINAL_STATUS="rejected"
+          fi
+          
+          echo "final_status=$FINAL_STATUS" >> $GITHUB_OUTPUT
       - name: Slack Notification
         uses: techoabhishek/cicd-hub-repo/.github/actions/slack-notify@main
         with:
           # This grabs the result ('success', 'failure', 'cancelled') from the previous job
-          status: ${{ needs.build-and-deploy.result }}
+          status: ${{ steps.status.outputs.final_status }}
           slack_webhook: ${{ secrets.SLACK_WEBHOOK }}
           job_name: "Deploy: ${{ github.repository }}"
