@@ -50,6 +50,12 @@ runs:
           HEADER="Approval Required"
           BUTTON_TEXT="Review & Approve"
           MENTION_TEXT="$MENTION "
+        
+        elif [ "$STATUS" == "started" ]; then
+          COLOR="#2196F3" # Bright Blue
+          EMOJI=":rocket:"
+          HEADER="Deployment Started"
+          MENTION_TEXT=""
 
         elif [ "$STATUS" == "rejected" ]; then
           COLOR="#820000" # Dark Red / Maroon (Distinct from failure)

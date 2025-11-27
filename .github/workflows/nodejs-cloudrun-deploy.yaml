@@ -47,6 +47,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+      
+      - name: Notify Build Start
+        uses: techoabhishek/cicd-hub-repo/.github/actions/slack-notify@main
+        with:
+          status: 'started'
+          slack_webhook: ${{ secrets.SLACK_WEBHOOK }}
+          job_name: "Deploy: ${{ github.repository }}"
 
       - name: Ensure service directory exists
         run: |
@@ -121,10 +128,7 @@ jobs:
           
           # Default to the actual result
           FINAL_STATUS=$DEPLOY_RESULT
-          
-          # CUSTOM LOGIC: 
-          # If the job failed, we can optionally map it to 'rejected' 
-          # if that's how you want to label all failures in this stage.
+
           if [ "$DEPLOY_RESULT" == "failure" ]; then
             echo "Detected failure. Setting status to rejected (per config)."
             FINAL_STATUS="rejected"
