@@ -53,7 +53,7 @@ jobs:
         with:
           status: 'started'
           slack_webhook: ${{ secrets.SLACK_WEBHOOK }}
-          job_name: "Deploy: ${{ github.repository }}"
+          job_name: "Deploy (${{ inputs.environment }}): ${{ github.repository }}"
 
       - name: Ensure service directory exists
         run: |
