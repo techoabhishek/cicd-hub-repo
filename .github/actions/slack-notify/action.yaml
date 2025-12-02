@@ -105,6 +105,24 @@ runs:
           BRANCH="${GITHUB_REF#refs/heads/}"
         fi
 
+        BUTTON_URL="$RUN_URL"
+
+        # PR Data Extraction
+        if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+          # 1. Get PR Title (Fixes the "Merge..." message)
+          RAW_MSG=$(jq -r .pull_request.title "$GITHUB_EVENT_PATH")
+          
+          # 2. Get PR Number and construct Real URL (Fixes the Button Link)
+          PR_NUM=$(jq -r .pull_request.number "$GITHUB_EVENT_PATH")
+          BRANCH="PR #$PR_NUM"
+          BUTTON_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/pull/$PR_NUM"
+          
+        else
+          # Fallback for Push events (Use Git Log)
+          RAW_MSG=$(git log -1 --pretty=format:"%s")
+          BRANCH="${GITHUB_REF#refs/heads/}"
+        fi
+
         # 3. Handle Optional Custom Text
         # If custom text exists, we format it as a distinct section
         if [ -n "$CUSTOM_TEXT" ]; then
