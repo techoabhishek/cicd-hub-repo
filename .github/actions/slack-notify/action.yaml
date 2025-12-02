@@ -15,6 +15,10 @@ inputs:
     description: 'Slack ID or Group to mention on failure'
     required: false
     default: '<!here>' 
+  custom_text:
+    description: 'Optional extra text to display in the message'
+    required: false
+    default: ''
 
 runs:
   using: "composite"
@@ -26,6 +30,7 @@ runs:
         STATUS: ${{ inputs.status }}
         JOB_NAME: ${{ inputs.job_name }}
         MENTION: ${{ inputs.mention_on_failure }}
+        CUSTOM_TEXT: ${{ inputs.custom_text }}
       run: |
         # 1. Logic for Colors, Emojis, and Mentions
         MENTION_TEXT=""
@@ -85,6 +90,7 @@ runs:
             {
               "color": "$COLOR",
               "pretext": "$MENTION_TEXT $EMOJI *${JOB_NAME}* - $HEADER",
+              "text": "$CUSTOM_TEXT",
               "fields": [
                 { "title": "Repo", "value": "<$REPO_URL|$GITHUB_REPOSITORY>", "short": true },
                 { "title": "Ref", "value": "\`$BRANCH\`", "short": true },
