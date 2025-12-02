@@ -87,16 +87,15 @@ runs:
         AUTHOR="$GITHUB_ACTOR"
         BRANCH="${GITHUB_REF#refs/heads/}"
         SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
-        DATE=$(date "+%Y-%m-%d %H:%M %Z")
         FULL_MSG=$(git log -1 --pretty=format:"%s" | sed 's/"/\\"/g')
         CLEAN_MSG=$(echo "$FULL_MSG" | head -n 1 | cut -c1-50)
 
         # 3. Handle Optional Custom Text
         # If custom text exists, we format it as a distinct section
         if [ -n "$CUSTOM_TEXT" ]; then
-           TEXT_BLOCK="{ \"type\": \"divider\" }, { \"type\": \"section\", \"text\": { \"type\": \"mrkdwn\", \"text\": \"ℹ️ $CUSTOM_TEXT\" } },"
+          TEXT_BLOCK="{ \"type\": \"divider\" }, { \"type\": \"section\", \"text\": { \"type\": \"mrkdwn\", \"text\": \"ℹ️ $CUSTOM_TEXT\" } },"
         else
-           TEXT_BLOCK=""
+          TEXT_BLOCK=""
         fi
 
         # 4. Construct Block Kit Payload
@@ -138,7 +137,10 @@ runs:
                 {
                   "type": "context",
                   "elements": [
-                    { "type": "mrkdwn", "text": "Vonage Enterprise CI/CD Hub • $DATE" }
+                    { 
+                      "type": "mrkdwn",
+                      "text": "Vonage Enterprise CI/CD Hub • <!date^$(date +%s)^{date} at {time}|Time>"
+                    }
                   ]
                 }
               ]
