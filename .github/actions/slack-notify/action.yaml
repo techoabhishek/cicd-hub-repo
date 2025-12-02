@@ -32,45 +32,46 @@ runs:
         MENTION: ${{ inputs.mention_on_failure }}
         CUSTOM_TEXT: ${{ inputs.custom_text }}
       run: |
-        # 1. Logic for Colors, Emojis, and Mentions
+        # 1. Logic for Colors, Emojis, and styles
         MENTION_TEXT=""
         BUTTON_TEXT="View Logs"
-        BUTTON_STYLE="primary"
+        BUTTON_STYLE="primary" # Default Green for Block Kit
         
         if [ "$STATUS" == "success" ]; then
           COLOR="#36a64f" # Green
-          EMOJI=":white_check_mark:"
-          HEADER="Build Succeeded"
+          EMOJI="✅"
+          HEADER="Deployment Successful"
           
         elif [ "$STATUS" == "failure" ]; then
           COLOR="#dc3545" # Red
-          EMOJI=":x:"
-          HEADER="Build Failed"
-          MENTION_TEXT="$MENTION " 
-          BUTTON_STYLE="danger"
+          EMOJI="🚨"
+          HEADER="Deployment Failed"
+          MENTION_TEXT="$MENTION" 
+          BUTTON_STYLE="danger" # Red Button
           
         elif [ "$STATUS" == "approval" ]; then
-          COLOR="#ffc107" # Amber/Yellow
-          EMOJI=":raised_hand:"
+          COLOR="#ffc107" # Amber
+          EMOJI="✋"
           HEADER="Approval Required"
           BUTTON_TEXT="Review & Approve"
-          MENTION_TEXT="$MENTION "
-        
+          MENTION_TEXT="$MENTION"
+          
         elif [ "$STATUS" == "started" ]; then
-          COLOR="#2196F3" # Bright Blue
-          EMOJI=":rocket:"
+          COLOR="#2196F3" # Blue
+          EMOJI="🚀"
           HEADER="Deployment Started"
-          MENTION_TEXT=""
+          MENTION_TEXT="" 
 
         elif [ "$STATUS" == "rejected" ]; then
-          COLOR="#820000" # Dark Red / Maroon (Distinct from failure)
-          EMOJI=":no_entry_sign:" # Stop sign symbol
+          COLOR="#820000" # Maroon
+          EMOJI="🚫"
           HEADER="Deployment Rejected"
-          MENTION_TEXT="$MENTION "
+          MENTION_TEXT="$MENTION"
+          BUTTON_STYLE="danger"
           
         else
           COLOR="#808080" # Gray
-          EMOJI=":bow:"
+          EMOJI="⚪"
           HEADER="Build Cancelled"
         fi
 
@@ -81,32 +82,90 @@ runs:
         AUTHOR="$GITHUB_ACTOR"
         BRANCH="${GITHUB_REF#refs/heads/}"
         MESSAGE=$(git log -1 --pretty=format:"%s" || echo "No commit message")
+        SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
+        DATE=$(date "+%Y-%m-%d %H:%M:%S")
 
-        # 3. Construct Payload
-        # We prepend MENTION_TEXT to the pretext so it triggers a notification
+        # 3. Handle Optional Custom Text
+        # If custom text exists, we format it as a distinct section
+        if [ -n "$CUSTOM_TEXT" ]; then
+          TEXT_BLOCK="{ \"type\": \"section\", \"text\": { \"type\": \"mrkdwn\", \"text\": \"$CUSTOM_TEXT\" } },"
+        else
+          TEXT_BLOCK=""
+        fi
+
+        # 4. Construct Block Kit Payload
+        # We nest 'blocks' inside 'attachments' to keep the side Color Bar
         PAYLOAD=$(cat <<EOF
         {
           "attachments": [
             {
               "color": "$COLOR",
-              "pretext": "$MENTION_TEXT $EMOJI *${JOB_NAME}* - $HEADER",
-              "text": "$CUSTOM_TEXT",
-              "fields": [
-                { "title": "Repo", "value": "<$REPO_URL|$GITHUB_REPOSITORY>", "short": true },
-                { "title": "Ref", "value": "\`$BRANCH\`", "short": true },
-                { "title": "Commit", "value": "<$COMMIT_URL|$(echo $GITHUB_SHA | cut -c1-7)>: $MESSAGE", "short": false },
-                { "title": "Actor", "value": "$AUTHOR", "short": true }
-              ],
-              "actions": [
+              "blocks": [
                 {
-                  "type": "button",
-                  "text": "$BUTTON_TEXT",
-                  "url": "$RUN_URL",
-                  "style": "$BUTTON_STYLE"
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "$EMOJI $HEADER",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Pipeline:* $JOB_NAME\n$MENTION_TEXT"
+                  }
+                },
+                {
+                  "type": "divider"
+                },
+                $TEXT_BLOCK
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Repository:*\n<$REPO_URL|$GITHUB_REPOSITORY>"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Reference:*\n\`$BRANCH\`"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit:*\n<$COMMIT_URL|$SHORT_SHA>"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Triggered By:*\n$AUTHOR"
+                    }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "$BUTTON_TEXT",
+                        "emoji": true
+                      },
+                      "style": "$BUTTON_STYLE",
+                      "url": "$RUN_URL"
+                    }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "Vonage Enterprise CI/CD Hub • $DATE"
+                    }
+                  ]
                 }
-              ],
-              "footer": "Vonage Enterprise CI/CD Hub",
-              "ts": $(date +%s)
+              ]
             }
           ]
         }
