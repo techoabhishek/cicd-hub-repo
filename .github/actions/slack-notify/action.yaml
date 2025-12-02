@@ -48,6 +48,7 @@ runs:
           HEADER="Deployment Failed"
           MENTION_TEXT="$MENTION" 
           BUTTON_STYLE="danger" # Red Button
+          CUSTOM_TEXT=""
           
         elif [ "$STATUS" == "approval" ]; then
           COLOR="#ffc107" # Amber
@@ -55,12 +56,14 @@ runs:
           HEADER="Approval Required"
           BUTTON_TEXT="Review & Approve"
           MENTION_TEXT="$MENTION"
+          CUSTOM_TEXT=""
           
         elif [ "$STATUS" == "started" ]; then
           COLOR="#2196F3" # Blue
           EMOJI="🚀"
           HEADER="Deployment Started"
-          MENTION_TEXT="" 
+          MENTION_TEXT=""
+          CUSTOM_TEXT="" 
 
         elif [ "$STATUS" == "rejected" ]; then
           COLOR="#820000" # Maroon
@@ -68,10 +71,11 @@ runs:
           HEADER="Deployment Rejected"
           MENTION_TEXT="$MENTION"
           BUTTON_STYLE="danger"
+          CUSTOM_TEXT=""
           
         else
           COLOR="#808080" # Gray
-          EMOJI="⚪"
+          EMOJI="🙅‍♂️"
           HEADER="Build Cancelled"
         fi
 
@@ -81,14 +85,14 @@ runs:
         COMMIT_URL="$REPO_URL/commit/$GITHUB_SHA"
         AUTHOR="$GITHUB_ACTOR"
         BRANCH="${GITHUB_REF#refs/heads/}"
-        MESSAGE=$(git log -1 --pretty=format:"%s" || echo "No commit message")
         SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
         DATE=$(date "+%Y-%m-%d %H:%M:%S")
 
         # 3. Handle Optional Custom Text
         # If custom text exists, we format it as a distinct section
         if [ -n "$CUSTOM_TEXT" ]; then
-          TEXT_BLOCK="{ \"type\": \"section\", \"text\": { \"type\": \"mrkdwn\", \"text\": \"$CUSTOM_TEXT\" } },"
+          # Adds a divider and the text section
+          TEXT_BLOCK="{ \"type\": \"divider\" }, { \"type\": \"section\", \"text\": { \"type\": \"mrkdwn\", \"text\": \"ℹ️ *$CUSTOM_TEXT*\" } },"
         else
           TEXT_BLOCK=""
         fi
@@ -111,46 +115,25 @@ runs:
                 },
                 {
                   "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*Pipeline:* $JOB_NAME\n$MENTION_TEXT"
-                  }
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*Pipeline:*\n$JOB_NAME" },
+                    { "type": "mrkdwn", "text": "*Triggered By:*\n$AUTHOR" }
+                  ]
                 },
-                {
-                  "type": "divider"
-                },
-                $TEXT_BLOCK
                 {
                   "type": "section",
                   "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Repository:*\n<$REPO_URL|$GITHUB_REPOSITORY>"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Reference:*\n\`$BRANCH\`"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Commit:*\n<$COMMIT_URL|$SHORT_SHA>"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Triggered By:*\n$AUTHOR"
-                    }
+                    { "type": "mrkdwn", "text": "*Repo:*\n<$REPO_URL|$GITHUB_REPOSITORY>" },
+                    { "type": "mrkdwn", "text": "*Ref:*\n\`$BRANCH\`" }
                   ]
                 },
+                $TEXT_BLOCK
                 {
                   "type": "actions",
                   "elements": [
                     {
                       "type": "button",
-                      "text": {
-                        "type": "plain_text",
-                        "text": "$BUTTON_TEXT",
-                        "emoji": true
-                      },
+                      "text": { "type": "plain_text", "text": "$BUTTON_TEXT", "emoji": true },
                       "style": "$BUTTON_STYLE",
                       "url": "$RUN_URL"
                     }
@@ -159,10 +142,7 @@ runs:
                 {
                   "type": "context",
                   "elements": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "Vonage Enterprise CI/CD Hub • $DATE"
-                    }
+                    { "type": "mrkdwn", "text": "Vonage Enterprise CI/CD Hub • $DATE $MENTION_TEXT" }
                   ]
                 }
               ]

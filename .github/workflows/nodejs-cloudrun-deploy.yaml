@@ -142,4 +142,4 @@ jobs:
           status: ${{ steps.status.outputs.final_status }}
           slack_webhook: ${{ secrets.SLACK_WEBHOOK }}
           job_name: "Deploy: ${{ github.repository }}"
-          custom_text: "Service got deployed. Go to GCP Console and validate. If not working as expected, rollback traffic manually to previous revision."
+          custom_text: "Deployment successfully completed. Please verify service health via the GCP Console. If anomalies are detected, initiate a manual rollback to the previous revision immediately."
