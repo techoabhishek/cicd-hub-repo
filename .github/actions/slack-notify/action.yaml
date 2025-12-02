@@ -87,14 +87,16 @@ runs:
         BRANCH="${GITHUB_REF#refs/heads/}"
         SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
         DATE=$(date "+%Y-%m-%d %H:%M:%S")
+        # Fix missing commit message (Truncate to 50 chars to keep layout clean)
+        FULL_MSG=$(git log -1 --pretty=format:"%s")
+        CLEAN_MSG=$(echo "$FULL_MSG" | head -n 1 | cut -c1-50)
 
         # 3. Handle Optional Custom Text
         # If custom text exists, we format it as a distinct section
         if [ -n "$CUSTOM_TEXT" ]; then
-          # Adds a divider and the text section
-          TEXT_BLOCK="{ \"type\": \"divider\" }, { \"type\": \"section\", \"text\": { \"type\": \"mrkdwn\", \"text\": \"ℹ️ *$CUSTOM_TEXT*\" } },"
+           TEXT_BLOCK="{ \"type\": \"divider\" }, { \"type\": \"section\", \"text\": { \"type\": \"mrkdwn\", \"text\": \"ℹ️ $CUSTOM_TEXT\" } },"
         else
-          TEXT_BLOCK=""
+           TEXT_BLOCK=""
         fi
 
         # 4. Construct Block Kit Payload
@@ -106,25 +108,19 @@ runs:
               "color": "$COLOR",
               "blocks": [
                 {
-                  "type": "header",
+                  "type": "section",
                   "text": {
-                    "type": "plain_text",
-                    "text": "$EMOJI $HEADER",
-                    "emoji": true
+                    "type": "mrkdwn",
+                    "text": "$EMOJI *$HEADER* |   *Pipeline:* $JOB_NAME"
                   }
                 },
                 {
                   "type": "section",
                   "fields": [
-                    { "type": "mrkdwn", "text": "*Pipeline:*\n$JOB_NAME" },
-                    { "type": "mrkdwn", "text": "*Triggered By:*\n$AUTHOR" }
-                  ]
-                },
-                {
-                  "type": "section",
-                  "fields": [
                     { "type": "mrkdwn", "text": "*Repo:*\n<$REPO_URL|$GITHUB_REPOSITORY>" },
-                    { "type": "mrkdwn", "text": "*Ref:*\n\`$BRANCH\`" }
+                    { "type": "mrkdwn", "text": "*Ref:*\n\`$BRANCH\`" },
+                    { "type": "mrkdwn", "text": "*Commit:*\n<$COMMIT_URL|$SHORT_SHA> - $CLEAN_MSG" },
+                    { "type": "mrkdwn", "text": "*Triggered By:*\n$AUTHOR" }
                   ]
                 },
                 $TEXT_BLOCK
@@ -142,7 +138,7 @@ runs:
                 {
                   "type": "context",
                   "elements": [
-                    { "type": "mrkdwn", "text": "Vonage Enterprise CI/CD Hub • $DATE $MENTION_TEXT" }
+                    { "type": "mrkdwn", "text": "$MENTION_TEXT  •  $DATE" }
                   ]
                 }
               ]
