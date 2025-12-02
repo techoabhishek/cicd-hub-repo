@@ -1,0 +1,44 @@
+name: Node.js CI (Validation)
+
+on:
+  workflow_call:
+    inputs:
+      service_dir:
+        required: true
+        type: string
+    secrets:
+      SLACK_WEBHOOK:
+        required: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        
+      - name: Install Dependencies
+        run: |
+          cd ${{ inputs.service_dir }}
+          npm ci # Clean install for CI
+
+      - name: Run Tests
+        run: |
+          cd ${{ inputs.service_dir }}
+          npm test
+
+      - name: Docker Build (Dry Run)
+        # We build to ensure the Dockerfile is valid, but we DO NOT push.
+        run: |
+          cd ${{ inputs.service_dir }}
+          docker build . -t test-image:latest
+
+      # Optional: Notify that PR checks passed
+      - name: Notify Success
+        if: success()
+        uses: techoabhishek/cicd-hub-repo/.github/actions/slack-notify@main
+        with:
+          status: 'pr'
+          slack_webhook: ${{ secrets.SLACK_WEBHOOK }}
+          job_name: "PR Validation: ${{ github.repository }}"
+          custom_text: "All CI checks passed. Ready for review."

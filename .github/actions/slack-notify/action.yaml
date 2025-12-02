@@ -72,7 +72,15 @@ runs:
           MENTION_TEXT="$MENTION"
           BUTTON_STYLE="danger"
           CUSTOM_TEXT=""
-          
+        
+        elif [ "$STATUS" == "pr" ]; then
+          COLOR="#9C27B0" # Purple
+          EMOJI="🔀"
+          HEADER="PR Validation"
+          BUTTON_TEXT="View Pull Request"
+          MENTION_TEXT=""
+          CUSTOM_TEXT=""
+
         else
           COLOR="#808080" # Gray
           EMOJI="🙅‍♂️"
