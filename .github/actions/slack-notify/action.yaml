@@ -79,7 +79,6 @@ runs:
           HEADER="PR Validation"
           BUTTON_TEXT="View Pull Request"
           MENTION_TEXT=""
-          CUSTOM_TEXT=""
 
         else
           COLOR="#808080" # Gray
@@ -93,10 +92,18 @@ runs:
         RUN_URL="$REPO_URL/actions/runs/$GITHUB_RUN_ID"
         COMMIT_URL="$REPO_URL/commit/$GITHUB_SHA"
         AUTHOR="$GITHUB_ACTOR"
-        BRANCH="${GITHUB_REF#refs/heads/}"
         SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
         FULL_MSG=$(git log -1 --pretty=format:"%s" | sed 's/"/\\"/g')
         CLEAN_MSG=$(echo "$FULL_MSG" | head -n 1 | cut -c1-50)
+        
+        # Cleaner Branch Name Logic
+        if [[ "$GITHUB_REF" == refs/pull/* ]]; then
+          # Converts 'refs/pull/123/merge' to 'PR #123'
+          PR_NUM=$(echo $GITHUB_REF | cut -d'/' -f3)
+          BRANCH="PR #$PR_NUM"
+        else
+          BRANCH="${GITHUB_REF#refs/heads/}"
+        fi
 
         # 3. Handle Optional Custom Text
         # If custom text exists, we format it as a distinct section
@@ -107,7 +114,6 @@ runs:
         fi
 
         # 4. Construct Block Kit Payload
-        # We nest 'blocks' inside 'attachments' to keep the side Color Bar
         PAYLOAD=$(cat <<EOF
         {
           "attachments": [
