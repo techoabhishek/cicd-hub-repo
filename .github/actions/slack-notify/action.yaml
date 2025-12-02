@@ -77,6 +77,7 @@ runs:
           COLOR="#808080" # Gray
           EMOJI="🙅‍♂️"
           HEADER="Build Cancelled"
+          CUSTOM_TEXT=""
         fi
 
         # 2. Git Metadata
@@ -86,9 +87,8 @@ runs:
         AUTHOR="$GITHUB_ACTOR"
         BRANCH="${GITHUB_REF#refs/heads/}"
         SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
-        DATE=$(date "+%Y-%m-%d %H:%M:%S")
-        # Fix missing commit message (Truncate to 50 chars to keep layout clean)
-        FULL_MSG=$(git log -1 --pretty=format:"%s")
+        DATE=$(date "+%Y-%m-%d %H:%M %Z")
+        FULL_MSG=$(git log -1 --pretty=format:"%s" | sed 's/"/\\"/g')
         CLEAN_MSG=$(echo "$FULL_MSG" | head -n 1 | cut -c1-50)
 
         # 3. Handle Optional Custom Text
@@ -111,7 +111,7 @@ runs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "$EMOJI *$HEADER* |   *Pipeline:* $JOB_NAME"
+                    "text": "$MENTION_TEXT $EMOJI *$HEADER* |  *Pipeline:* $JOB_NAME"
                   }
                 },
                 {
@@ -138,7 +138,7 @@ runs:
                 {
                   "type": "context",
                   "elements": [
-                    { "type": "mrkdwn", "text": "$MENTION_TEXT  •  $DATE" }
+                    { "type": "mrkdwn", "text": "Vonage Enterprise CI/CD Hub • $DATE" }
                   ]
                 }
               ]
