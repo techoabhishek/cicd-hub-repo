@@ -32,82 +32,72 @@ runs:
         MENTION: ${{ inputs.mention_on_failure }}
         CUSTOM_TEXT: ${{ inputs.custom_text }}
       run: |
-        # 1. Logic for Colors, Emojis, and styles
+        # 1. Logic for Colors, Emojis
         MENTION_TEXT=""
         BUTTON_TEXT="View Logs"
-        BUTTON_STYLE="primary" # Default Green for Block Kit
+        BUTTON_STYLE="primary"
         
         if [ "$STATUS" == "success" ]; then
-          COLOR="#36a64f" # Green
+          COLOR="#36a64f"
           EMOJI="✅"
           HEADER="Deployment Successful"
           
         elif [ "$STATUS" == "failure" ]; then
-          COLOR="#dc3545" # Red
+          COLOR="#dc3545"
           EMOJI="🚨"
           HEADER="Deployment Failed"
           MENTION_TEXT="$MENTION" 
-          BUTTON_STYLE="danger" # Red Button
+          BUTTON_STYLE="danger"
           CUSTOM_TEXT=""
           
         elif [ "$STATUS" == "approval" ]; then
-          COLOR="#ffc107" # Amber
+          COLOR="#ffc107"
           EMOJI="✋"
           HEADER="Approval Required"
           BUTTON_TEXT="Review & Approve"
           MENTION_TEXT="$MENTION"
-          CUSTOM_TEXT=""
+          CUSTOM_TEXT="" 
           
         elif [ "$STATUS" == "started" ]; then
-          COLOR="#2196F3" # Blue
+          COLOR="#2196F3"
           EMOJI="🚀"
           HEADER="Deployment Started"
           MENTION_TEXT=""
-          CUSTOM_TEXT="" 
+          CUSTOM_TEXT=""
 
         elif [ "$STATUS" == "rejected" ]; then
-          COLOR="#820000" # Maroon
+          COLOR="#820000"
           EMOJI="🚫"
           HEADER="Deployment Rejected"
           MENTION_TEXT="$MENTION"
           BUTTON_STYLE="danger"
           CUSTOM_TEXT=""
-        
+
         elif [ "$STATUS" == "pr" ]; then
-          COLOR="#9C27B0" # Purple
+          COLOR="#9C27B0"
           EMOJI="🔀"
           HEADER="PR Validation"
           BUTTON_TEXT="View Pull Request"
           MENTION_TEXT=""
-
+          
         else
-          COLOR="#808080" # Gray
-          EMOJI="🙅‍♂️"
+          COLOR="#808080"
+          EMOJI="⚪"
           HEADER="Build Cancelled"
           CUSTOM_TEXT=""
         fi
 
-        # 2. Git Metadata
+        # 2. Git Metadata & Event Data
         REPO_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
         RUN_URL="$REPO_URL/actions/runs/$GITHUB_RUN_ID"
-        COMMIT_URL="$REPO_URL/commit/$GITHUB_SHA"
         AUTHOR="$GITHUB_ACTOR"
         SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
-        FULL_MSG=$(git log -1 --pretty=format:"%s" | sed 's/"/\\"/g')
-        CLEAN_MSG=$(echo "$FULL_MSG" | head -n 1 | cut -c1-50)
+        TIMESTAMP=$(date +%s)
         
-        # Cleaner Branch Name Logic
-        if [[ "$GITHUB_REF" == refs/pull/* ]]; then
-          # Converts 'refs/pull/123/merge' to 'PR #123'
-          PR_NUM=$(echo $GITHUB_REF | cut -d'/' -f3)
-          BRANCH="PR #$PR_NUM"
-        else
-          BRANCH="${GITHUB_REF#refs/heads/}"
-        fi
-
+        # Default Button URL (Points to Logs)
         BUTTON_URL="$RUN_URL"
 
-        # PR Data Extraction
+        # 🟢 SMART LOGIC: PR Data Extraction
         if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
           # 1. Get PR Title (Fixes the "Merge..." message)
           RAW_MSG=$(jq -r .pull_request.title "$GITHUB_EVENT_PATH")
@@ -123,15 +113,19 @@ runs:
           BRANCH="${GITHUB_REF#refs/heads/}"
         fi
 
-        # 3. Handle Optional Custom Text
-        # If custom text exists, we format it as a distinct section
+        # Clean the message (Remove quotes, truncate to 50 chars)
+        FULL_MSG=$(echo "$RAW_MSG" | sed 's/"/\\"/g')
+        CLEAN_MSG=$(echo "$FULL_MSG" | head -n 1 | cut -c1-50)
+
+        # 3. Handle Custom Text
         if [ -n "$CUSTOM_TEXT" ]; then
-          TEXT_BLOCK="{ \"type\": \"divider\" }, { \"type\": \"section\", \"text\": { \"type\": \"mrkdwn\", \"text\": \"ℹ️ $CUSTOM_TEXT\" } },"
+           TEXT_BLOCK="{ \"type\": \"divider\" }, { \"type\": \"section\", \"text\": { \"type\": \"mrkdwn\", \"text\": \"ℹ️ $CUSTOM_TEXT\" } },"
         else
-          TEXT_BLOCK=""
+           TEXT_BLOCK=""
         fi
 
-        # 4. Construct Block Kit Payload
+        # 4. Construct Payload
+        # Note: We now use $BUTTON_URL for the button action
         PAYLOAD=$(cat <<EOF
         {
           "attachments": [
@@ -162,7 +156,7 @@ runs:
                       "type": "button",
                       "text": { "type": "plain_text", "text": "$BUTTON_TEXT", "emoji": true },
                       "style": "$BUTTON_STYLE",
-                      "url": "$RUN_URL"
+                      "url": "$BUTTON_URL"
                     }
                   ]
                 },
@@ -170,8 +164,8 @@ runs:
                   "type": "context",
                   "elements": [
                     { 
-                      "type": "mrkdwn",
-                      "text": "Vonage Enterprise CI/CD Hub • <!date^$(date +%s)^{date} at {time}|Time>"
+                      "type": "mrkdwn", 
+                      "text": "Vonage Enterprise CI/CD Hub • <!date^${TIMESTAMP}^{date} at {time}|${TIMESTAMP}>" 
                     }
                   ]
                 }
