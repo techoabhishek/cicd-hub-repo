@@ -97,20 +97,28 @@ runs:
         # Default Button URL (Points to Logs)
         BUTTON_URL="$RUN_URL"
 
-        # 🟢 SMART LOGIC: PR Data Extraction
+        # PR Data Extraction
         if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
           # 1. Get PR Title (Fixes the "Merge..." message)
           RAW_MSG=$(jq -r .pull_request.title "$GITHUB_EVENT_PATH")
           
-          # 2. Get PR Number and construct Real URL (Fixes the Button Link)
+          # 2. Get PR Number and construct Real URL
           PR_NUM=$(jq -r .pull_request.number "$GITHUB_EVENT_PATH")
           BRANCH="PR #$PR_NUM"
           BUTTON_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/pull/$PR_NUM"
+
+          # 3. FIX COMMIT SHA: Use the Head SHA (Actual commit), not Merge SHA
+          REAL_SHA=$(jq -r .pull_request.head.sha "$GITHUB_EVENT_PATH")
+          SHORT_SHA=$(echo $REAL_SHA | cut -c1-7)
+          COMMIT_URL="$REPO_URL/commit/$REAL_SHA"
           
         else
           # Fallback for Push events (Use Git Log)
           RAW_MSG=$(git log -1 --pretty=format:"%s")
           BRANCH="${GITHUB_REF#refs/heads/}"
+
+          SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
+          COMMIT_URL="$REPO_URL/commit/$GITHUB_SHA"
         fi
 
         # Clean the message (Remove quotes, truncate to 50 chars)
@@ -119,9 +127,9 @@ runs:
 
         # 3. Handle Custom Text
         if [ -n "$CUSTOM_TEXT" ]; then
-           TEXT_BLOCK="{ \"type\": \"divider\" }, { \"type\": \"section\", \"text\": { \"type\": \"mrkdwn\", \"text\": \"ℹ️ $CUSTOM_TEXT\" } },"
+          TEXT_BLOCK="{ \"type\": \"divider\" }, { \"type\": \"section\", \"text\": { \"type\": \"mrkdwn\", \"text\": \"ℹ️ $CUSTOM_TEXT\" } },"
         else
-           TEXT_BLOCK=""
+          TEXT_BLOCK=""
         fi
 
         # 4. Construct Payload
