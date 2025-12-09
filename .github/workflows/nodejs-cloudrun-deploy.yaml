@@ -125,15 +125,6 @@ jobs:
         id: status
         run: |
           DEPLOY_RESULT="${{ needs.build-and-deploy.result }}"
-          
-          # Default to the actual result
-          FINAL_STATUS=$DEPLOY_RESULT
-
-          if [ "$DEPLOY_RESULT" == "failure" ]; then
-            echo "Detected failure. Setting status to rejected (per config)."
-            FINAL_STATUS="rejected"
-          fi
-          
           echo "final_status=$FINAL_STATUS" >> $GITHUB_OUTPUT
       - name: Slack Notification
         uses: techoabhishek/cicd-hub-repo/.github/actions/slack-notify@main

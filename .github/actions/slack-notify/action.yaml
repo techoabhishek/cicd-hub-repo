@@ -65,13 +65,13 @@ runs:
           MENTION_TEXT=""
           CUSTOM_TEXT=""
 
-        elif [ "$STATUS" == "rejected" ]; then
-          COLOR="#820000"
-          EMOJI="🚫"
-          HEADER="Deployment Rejected"
-          MENTION_TEXT="$MENTION"
-          BUTTON_STYLE="danger"
-          CUSTOM_TEXT=""
+        # elif [ "$STATUS" == "rejected" ]; then
+        #   COLOR="#820000"
+        #   EMOJI="🚫"
+        #   HEADER="Deployment Rejected"
+        #   MENTION_TEXT="$MENTION"
+        #   BUTTON_STYLE="danger"
+        #   CUSTOM_TEXT=""
 
         elif [ "$STATUS" == "pr" ]; then
           COLOR="#9C27B0"
