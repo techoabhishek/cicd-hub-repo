@@ -151,3 +151,5 @@ In the `call-hub-deploy` job of your Spoke workflow, you must provide values for
 *   `service_name`: The name of your service in Google Cloud Run.
 
 And that's it! When you push a commit or create a pull request in your Spoke repository, it will now use the centralized logic from this Hub to run its CI/CD pipeline.
+
+# Checking Commit
