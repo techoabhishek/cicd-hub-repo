@@ -1,10 +1,21 @@
 # <type>(<scope>): <short description>
-
 # Example: feat(auth): add JWT authentication
+# Add your type, scope, and short description below this line:
+# ----------------------------------------
+ 
 
-# Detailed explanation of the change, if necessary.
+# Detailed explanation of the change (if necessary)
 # Why is this change being made? Any technical debt or issues resolved?
+# Add your detailed explanation below this line:
+# ----------------------------------------
+ 
 
 # BREAKING CHANGE: <if applicable, describe any breaking changes>
+# Add your breaking change description below this line (or leave empty if none):
+# ----------------------------------------
+ 
 
 # Related issue: #<issue_number> (e.g., #123)
+# Add related issue numbers below this line (or leave empty if none):
+# ----------------------------------------
+ 
