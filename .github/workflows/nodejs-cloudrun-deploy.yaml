@@ -125,7 +125,7 @@ jobs:
         id: status
         run: |
           DEPLOY_RESULT="${{ needs.build-and-deploy.result }}"
-          echo "final_status=$FINAL_STATUS" >> $GITHUB_OUTPUT
+          echo "final_status=$DEPLOY_RESULT" >> $GITHUB_OUTPUT
       - name: Slack Notification
         uses: techoabhishek/cicd-hub-repo/.github/actions/slack-notify@main
         with:
