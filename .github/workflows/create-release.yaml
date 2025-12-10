@@ -1,0 +1,41 @@
+name: Create Enterprise Release
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+        description: "Environment deployed to (e.g., production)"
+    secrets:
+      # We need a token with permission to create Releases. 
+      # Usually 'GITHUB_TOKEN' is enough if permissions are set correctly.
+      GITHUB_TOKEN:
+        required: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Generate Tag Name
+        id: tag
+        run: |
+          # Pattern: prod-v<Run_Number> (e.g., prod-v105)
+          # You can change this naming convention later
+          TAG_NAME="${{ inputs.environment }}-v${{ github.run_number }}"
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.tag.outputs.tag_name }}
+          name: "Release ${{ steps.tag.outputs.tag_name }}"
+          generate_release_notes: true # 👈 THE MAGIC: Auto-generates notes from PRs
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
