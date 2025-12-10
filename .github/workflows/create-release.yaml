@@ -6,11 +6,6 @@ on:
         required: true
         type: string
         description: "Environment deployed to (e.g., production)"
-    secrets:
-      # We need a token with permission to create Releases. 
-      # Usually 'GITHUB_TOKEN' is enough if permissions are set correctly.
-      GITHUB_TOKEN:
-        required: false
 
 jobs:
   release:
