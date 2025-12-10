@@ -18,4 +18,3 @@
 # Related issue: #<issue_number> (e.g., #123)
 # Add related issue numbers below this line (or leave empty if none):
 # ----------------------------------------
- 
