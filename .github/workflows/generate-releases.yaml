@@ -12,40 +12,33 @@ jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      pull-requests: read
+      contents: write       # Required to create tags/releases
+      pull-requests: read   # Required to read commit history
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4 # Updated to v4 (standard)
         with:
-          fetch-depth: 0
+          fetch-depth: 0      # ⚠️ Critical: Must fetch full history to see tags
 
-      - name: Calculate next version (vX.X.X)
+      # 🟢 REPLACEMENT: Robust Version Calculator
+      # This calculates the next version (v1.0.0 -> v1.0.1) automatically
+      - name: Calculate next version
         id: version
-        run: |
-          LAST_TAG=$(git tag --sort=-v:refname | grep '^v[0-9]\+\.[0-9]\+\.[0-9]\+$' | head -n 1)
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          default_bump: patch   # 👈 This ensures it increments to v1.0.1 if no 'feat' is found
+          release_branches: main
+          dry_run: true         # We just want the number, we let the release step do the tagging
 
-          echo "The last tag found is: $LAST_TAG"
+      # 🟢 SIMPLIFICATION: You do NOT need a manual 'git tag/push' step.
+      # The release action below creates the tag automatically.
 
-          if [[ -z "$LAST_TAG" ]]; then
-            NEXT_VERSION="v1.0.0"
-          else
-            VERSION=${LAST_TAG#v}
-            IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
-            PATCH=$((PATCH + 1))
-            NEXT_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
-          fi
-
-          echo "next_version=$NEXT_VERSION" >> $GITHUB_OUTPUT
-
-      - name: Create Git tag
-        run: |
-          git tag ${{ steps.version.outputs.next_version }}
-          git push origin ${{ steps.version.outputs.next_version }}
-
-      - name: Create GitHub Release with auto notes
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.next_version }}
+          # Use the calculated tag from the previous step (e.g., v1.0.1)
+          tag_name: ${{ steps.version.outputs.new_tag }}
+          name: "Release ${{ steps.version.outputs.new_tag }}"
           generate_release_notes: true
