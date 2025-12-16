@@ -17,12 +17,16 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Calculate next version (vX.X.X)
         id: version
         run: |
           LAST_TAG=$(git tag --sort=-v:refname | grep '^v[0-9]\+\.[0-9]\+\.[0-9]\+$' | head -n 1)
+
+          echo "The last tag found is: $LAST_TAG"
 
           if [[ -z "$LAST_TAG" ]]; then
             NEXT_VERSION="v1.0.0"
