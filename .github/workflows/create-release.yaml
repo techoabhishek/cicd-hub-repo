@@ -11,26 +11,27 @@ jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # ⚠️ REQUIRED: To create tags and releases
+      pull-requests: read # Required to read PR titles for changelogs
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # ⚠️ Critical: Must fetch full history to generate notes
 
       - name: Generate Tag Name
         id: tag
         run: |
-          # Pattern: prod-v<Run_Number> (e.g., prod-v105)
-          # You can change this naming convention later
-          TAG_NAME="${{ inputs.environment }}-v${{ github.run_number }}"
+          # Strategy: Use Run Number for uniqueness (e.g., v105)
+          # You can change this to Date or Semantic Versioning later
+          TAG_NAME="v${{ github.run_number }}"
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.tag.outputs.tag_name }}
-          name: "Release ${{ steps.tag.outputs.tag_name }}"
-          generate_release_notes: true # 👈 THE MAGIC: Auto-generates notes from PRs
+          name: "Production Release ${{ steps.tag.outputs.tag_name }}"
+          generate_release_notes: true # 👈 This looks for .github/release.yml in the Spoke
           draft: false
           prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
