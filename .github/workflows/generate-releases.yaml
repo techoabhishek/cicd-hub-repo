@@ -1,0 +1,47 @@
+name: Generate Release
+
+on:
+  workflow_call:
+    inputs:
+      release_branch:
+        required: false
+        type: string
+        default: main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Calculate next version (vX.X.X)
+        id: version
+        run: |
+          LAST_TAG=$(git tag --sort=-v:refname | grep '^v[0-9]\+\.[0-9]\+\.[0-9]\+$' | head -n 1)
+
+          if [[ -z "$LAST_TAG" ]]; then
+            NEXT_VERSION="v1.0.0"
+          else
+            VERSION=${LAST_TAG#v}
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+            PATCH=$((PATCH + 1))
+            NEXT_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+          fi
+
+          echo "next_version=$NEXT_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create Git tag
+        run: |
+          git tag ${{ steps.version.outputs.next_version }}
+          git push origin ${{ steps.version.outputs.next_version }}
+
+      - name: Create GitHub Release with auto notes
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.next_version }}
+          generate_release_notes: true
