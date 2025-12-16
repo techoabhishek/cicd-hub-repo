@@ -11,27 +11,39 @@ jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # ⚠️ REQUIRED: To create tags and releases
-      pull-requests: read # Required to read PR titles for changelogs
+      contents: write
+      pull-requests: read
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # ⚠️ Critical: Must fetch full history to generate notes
+          fetch-depth: 0 # ⚠️ Required for the calculator to see history
 
-      - name: Generate Tag Name
-        id: tag
+      # 🟢 NEW: The "Calculator" Step
+      - name: Calculate Next Version
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          default_bump: patch   # Default to v1.0.1 if no specific type found
+          release_branches: main
+          dry_run: true         # Calculate but don't tag yet (softprops will do it)
+
+      # 🟢 OPTIONAL: Handle Re-Runs (Delete tag if we are retrying a failed release)
+      - name: Delete Tag if Exists
+        env:
+          TAG_NAME: ${{ steps.tag_version.outputs.new_tag }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Strategy: Use Run Number for uniqueness (e.g., v105)
-          # You can change this to Date or Semantic Versioning later
-          TAG_NAME="v${{ github.run_number }}"
-          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          git tag -d $TAG_NAME || true
+          git push origin :refs/tags/$TAG_NAME || true
 
+      # 🟢 UPDATE: Use the calculated tag
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ steps.tag.outputs.tag_name }}
-          name: "Production Release ${{ steps.tag.outputs.tag_name }}"
-          generate_release_notes: true # 👈 This looks for .github/release.yml in the Spoke
+          tag_name: ${{ steps.tag_version.outputs.new_tag }}
+          name: "Release ${{ steps.tag_version.outputs.new_tag }}"
+          generate_release_notes: true
           draft: false
           prerelease: false
