@@ -30,6 +30,8 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           default_bump: patch   # 👈 This ensures it increments to v1.0.1 if no 'feat' is found
           release_branches: main
+          pre_release_branches: develop,staging
+          append_to_pre_release_tag: staging
           dry_run: true         # We just want the number, we let the release step do the tagging
 
       # 🟢 SIMPLIFICATION: You do NOT need a manual 'git tag/push' step.
@@ -42,3 +44,4 @@ jobs:
           tag_name: ${{ steps.version.outputs.new_tag }}
           name: "Release ${{ steps.version.outputs.new_tag }}"
           generate_release_notes: true
+          prerelease: ${{ github.ref != 'refs/heads/main' }}
