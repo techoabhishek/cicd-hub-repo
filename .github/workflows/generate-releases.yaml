@@ -14,7 +14,7 @@ on:
 
 
 jobs:
-  release:
+  create-release:
     runs-on: ubuntu-latest
     permissions:
       contents: write       # Required to create tags/releases
@@ -51,14 +51,16 @@ jobs:
           generate_release_notes: true
           # 🟢 UPDATE: Mark as Prerelease if we are on Staging
           prerelease: ${{ inputs.environment == 'staging' }}
-      
+  
       - name: Notify Slack
+        if: success() # Only notify if release worked
         uses: techoabhishek/cicd-hub-repo/.github/actions/slack-notify@main
         with:
           status: 'success'
-          slack_webhook: ${{ secrets.SLACK_WEBHOOK }}
+          # ⚠️ FIX: Ensure this matches the secret name in your Repo Settings
+          slack_webhook: ${{ secrets.SLACK_WEBHOOK }} 
           job_name: "🚀 New Release: ${{ steps.version.outputs.new_tag }} (${{ inputs.environment }})"
           custom_text: |
             New ${{ inputs.environment }} release is live!
             *Version:* ${{ steps.version.outputs.new_tag }}
-            *Notes:* <${{ steps.create_release.outputs.url }}|Click here for Changelog>
+            *Changelog:* <${{ steps.create_release.outputs.url }}|Click here to view Release Notes>
