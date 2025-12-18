@@ -7,6 +7,11 @@ on:
         required: false
         type: string
         default: main
+      environment:
+        required: true
+        type: string
+        default: production
+
 
 jobs:
   release:
@@ -29,8 +34,8 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           default_bump: patch   # 👈 This ensures it increments to v1.0.1 if no 'feat' is found
-          release_branches: main
-          pre_release_branches: develop,staging
+          release_branches: main,develop
+          pre_release_branches: develop
           append_to_pre_release_tag: staging
           dry_run: true         # We just want the number, we let the release step do the tagging
 
@@ -38,10 +43,22 @@ jobs:
       # The release action below creates the tag automatically.
 
       - name: Create GitHub Release
+        id: create_release
         uses: softprops/action-gh-release@v2
         with:
-          # Use the calculated tag from the previous step (e.g., v1.0.1)
           tag_name: ${{ steps.version.outputs.new_tag }}
           name: "Release ${{ steps.version.outputs.new_tag }}"
           generate_release_notes: true
-          prerelease: ${{ github.ref != 'refs/heads/main' }}
+          # 🟢 UPDATE: Mark as Prerelease if we are on Staging
+          prerelease: ${{ inputs.environment == 'staging' }}
+      
+      - name: Notify Slack
+        uses: techoabhishek/cicd-hub-repo/.github/actions/slack-notify@main
+        with:
+          status: 'success'
+          slack_webhook: ${{ secrets.SLACK_WEBHOOK }}
+          job_name: "🚀 New Release: ${{ steps.version.outputs.new_tag }} (${{ inputs.environment }})"
+          custom_text: |
+            New ${{ inputs.environment }} release is live!
+            *Version:* ${{ steps.version.outputs.new_tag }}
+            *Notes:* <${{ steps.create_release.outputs.url }}|Click here for Changelog>
