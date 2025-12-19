@@ -53,14 +53,19 @@ jobs:
           prerelease: ${{ inputs.environment == 'staging' }}
   
       - name: Notify Slack
-        if: success() # Only notify if release worked
+        if: success()
         uses: techoabhishek/cicd-hub-repo/.github/actions/slack-notify@main
         with:
           status: 'success'
-          # ⚠️ FIX: Ensure this matches the secret name in your Repo Settings
-          slack_webhook: ${{ secrets.SLACK_WEBHOOK }} 
-          job_name: "🚀 New Release: ${{ steps.version.outputs.new_tag }} (${{ inputs.environment }})"
+          slack_webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          
+          # 🟢 ACTIVATE NEW LOOK
+          mode: 'release'
+          title: 'New Release Published'
+          
+          # Pass raw environment name (logic handles capitalization)
+          job_name: "${{ inputs.environment }} (v${{ steps.version.outputs.new_tag }})"
+          
           custom_text: |
-            New ${{ inputs.environment }} release is live!
             *Version:* ${{ steps.version.outputs.new_tag }}
-            *Changelog:* <${{ steps.create_release.outputs.url }}|Click here to view Release Notes>
+            *Changelog:* <${{ steps.create_release.outputs.url }}|👉 Click here to view Release Notes>
