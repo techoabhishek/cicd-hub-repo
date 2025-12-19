@@ -110,8 +110,7 @@ runs:
                     { \"type\": \"mrkdwn\", \"text\": \"📍 *Target Environment:*\n$CAP_ENV\" },
                     { \"type\": \"mrkdwn\", \"text\": \"📦 *Repository:*\n<$REPO_URL|$GITHUB_REPOSITORY>\" }
                 ]},
-                { \"type\": \"section\", \"text\": { \"type\": \"mrkdwn\", \"text\": \"🏷️ *Version:* $VERSION_TAG\" } },
-                { \"type\": \"actions\", \"elements\": [ { \"type\": \"button\", \"text\": { \"type\": \"plain_text\", \"text\": \"$BUTTON_TEXT\" }, \"url\": \"$BUTTON_URL\" } ] }
+                { \"type\": \"context\", \"elements\": [ { \"type\": \"mrkdwn\", \"text\": \"Vonage Enterprise CI/CD Hub • <!date^${TIMESTAMP}^{date} at {time}|${TIMESTAMP}>\" } ] }
               ]
             }]
           }"
