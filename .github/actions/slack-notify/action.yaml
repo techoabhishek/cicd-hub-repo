@@ -19,7 +19,6 @@ inputs:
     description: 'Optional extra text to display in the message'
     required: false
     default: ''
-  # 🟢 NEW INPUTS FOR DUAL MODE
   mode:
     description: 'Notification style: deployment (default) or release'
     required: false
@@ -43,7 +42,7 @@ runs:
         MODE: ${{ inputs.mode }}
         INPUT_TITLE: ${{ inputs.title }}
       run: |
-        # 1. Logic for Colors, Emojis (Shared)
+        # 1. Logic for Colors, Emojis
         MENTION_TEXT=""
         BUTTON_TEXT="View Logs"
         BUTTON_STYLE="primary"
@@ -52,48 +51,40 @@ runs:
           COLOR="#36a64f"
           EMOJI="✅"
           HEADER="Deployment Successful"
-          
         elif [ "$STATUS" == "failure" ]; then
           COLOR="#dc3545"
           EMOJI="🚨"
           HEADER="Deployment Failed"
           MENTION_TEXT="$MENTION" 
           BUTTON_STYLE="danger"
-          
         elif [ "$STATUS" == "approval" ]; then
           COLOR="#ffc107"
           EMOJI="✋"
           HEADER="Approval Required"
           BUTTON_TEXT="Review & Approve"
           MENTION_TEXT="$MENTION"
-          
         elif [ "$STATUS" == "started" ]; then
           COLOR="#2196F3"
           EMOJI="🚀"
           HEADER="Deployment Started"
-
         elif [ "$STATUS" == "pr" ]; then
           COLOR="#9C27B0"
           EMOJI="🔀"
           HEADER="PR Validation"
           BUTTON_TEXT="View Pull Request"
-          
         else
           COLOR="#808080"
           EMOJI="⚪"
           HEADER="Status: $STATUS"
         fi
 
-        # 2. Git Metadata & Event Data (Shared Variables)
+        # 2. Metadata Extraction
         REPO_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
         RUN_URL="$REPO_URL/actions/runs/$GITHUB_RUN_ID"
         AUTHOR="$GITHUB_ACTOR"
         TIMESTAMP=$(date +%s)
-        
-        # Default Button URL
         BUTTON_URL="$RUN_URL"
 
-        # PR Data Extraction (Keep your existing logic)
         if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
           RAW_MSG=$(jq -r .pull_request.title "$GITHUB_EVENT_PATH")
           PR_NUM=$(jq -r .pull_request.number "$GITHUB_EVENT_PATH")
@@ -109,65 +100,54 @@ runs:
           COMMIT_URL="$REPO_URL/commit/$GITHUB_SHA"
         fi
 
-        # Clean Message
         FULL_MSG=$(echo "$RAW_MSG" | sed 's/"/\\"/g')
         CLEAN_MSG=$(echo "$FULL_MSG" | head -n 1 | cut -c1-50)
 
-        # ---------------------------------------------------
         # 3. DUAL MODE SWITCH
-        # ---------------------------------------------------
-
         if [[ "$MODE" == "release" ]]; then
-          # 🟢 RELEASE MODE (New, Clean Look)
-          
-          # Use Input Title or Default
+          # --- RELEASE MODE ---
           MAIN_TITLE="${INPUT_TITLE:-New Release Published}"
-          
-          # Capitalize & Bold Job Name (production -> Production)
           CAP_JOB_NAME="${JOB_NAME^}"
           FORMATTED_TARGET="*$CAP_JOB_NAME*"
 
           PAYLOAD=$(cat <<EOF
-          {
-            "attachments": [
-              {
-                "color": "$COLOR",
-                "blocks": [
-                  {
-                    "type": "header",
-                    "text": { "type": "plain_text", "text": "$EMOJI $MAIN_TITLE", "emoji": true }
-                  },
-                  {
-                    "type": "section",
-                    "text": { "type": "mrkdwn", "text": "$CUSTOM_TEXT" }
-                  },
-                  {
-                    "type": "context",
-                    "elements": [
-                      { "type": "mrkdwn", "text": "📍 *Target:* $FORMATTED_TARGET" }
-                    ]
-                  },
-                  {
-                    "type": "actions",
-                    "elements": [
-                      {
-                        "type": "button",
-                        "text": { "type": "plain_text", "text": "$BUTTON_TEXT", "emoji": true },
-                        "url": "$BUTTON_URL"
-                      }
-                    ]
-                  }
-                ]
-              }
-            ]
-          }
-          EOF
-          )
-
+        {
+          "attachments": [
+            {
+              "color": "$COLOR",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": { "type": "plain_text", "text": "$EMOJI $MAIN_TITLE", "emoji": true }
+                },
+                {
+                  "type": "section",
+                  "text": { "type": "mrkdwn", "text": "$CUSTOM_TEXT" }
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    { "type": "mrkdwn", "text": "📍 *Target:* $FORMATTED_TARGET" }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": { "type": "plain_text", "text": "$BUTTON_TEXT", "emoji": true },
+                      "url": "$BUTTON_URL"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+EOF
+)
         else
-          # 🔵 DEPLOYMENT MODE (Legacy - Preserves your EXACT previous layout)
-          
-          # Handle Custom Text Block for Legacy Mode
+          # --- DEPLOYMENT MODE ---
           if [ -n "$CUSTOM_TEXT" ]; then
             TEXT_BLOCK="{ \"type\": \"divider\" }, { \"type\": \"section\", \"text\": { \"type\": \"mrkdwn\", \"text\": \"ℹ️ $CUSTOM_TEXT\" } },"
           else
@@ -175,55 +155,55 @@ runs:
           fi
 
           PAYLOAD=$(cat <<EOF
-          {
-            "attachments": [
-              {
-                "color": "$COLOR",
-                "blocks": [
-                  {
-                    "type": "section",
-                    "text": {
-                      "type": "mrkdwn",
-                      "text": "$MENTION_TEXT $EMOJI *$HEADER* |  *Pipeline:* $JOB_NAME"
-                    }
-                  },
-                  {
-                    "type": "section",
-                    "fields": [
-                      { "type": "mrkdwn", "text": "*Repo:*\n<$REPO_URL|$GITHUB_REPOSITORY>" },
-                      { "type": "mrkdwn", "text": "*Ref:*\n\`$BRANCH\`" },
-                      { "type": "mrkdwn", "text": "*Commit:*\n<$COMMIT_URL|$SHORT_SHA> - $CLEAN_MSG" },
-                      { "type": "mrkdwn", "text": "*Triggered By:*\n$AUTHOR" }
-                    ]
-                  },
-                  $TEXT_BLOCK
-                  {
-                    "type": "actions",
-                    "elements": [
-                      {
-                        "type": "button",
-                        "text": { "type": "plain_text", "text": "$BUTTON_TEXT", "emoji": true },
-                        "style": "$BUTTON_STYLE",
-                        "url": "$BUTTON_URL"
-                      }
-                    ]
-                  },
-                  {
-                    "type": "context",
-                    "elements": [
-                      { 
-                        "type": "mrkdwn", 
-                        "text": "Vonage Enterprise CI/CD Hub • <!date^${TIMESTAMP}^{date} at {time}|${TIMESTAMP}>" 
-                      }
-                    ]
+        {
+          "attachments": [
+            {
+              "color": "$COLOR",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "$MENTION_TEXT $EMOJI *$HEADER* |  *Pipeline:* $JOB_NAME"
                   }
-                ]
-              }
-            ]
-          }
-          EOF
-          )
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*Repo:*\n<$REPO_URL|$GITHUB_REPOSITORY>" },
+                    { "type": "mrkdwn", "text": "*Ref:*\n\`$BRANCH\`" },
+                    { "type": "mrkdwn", "text": "*Commit:*\n<$COMMIT_URL|$SHORT_SHA> - $CLEAN_MSG" },
+                    { "type": "mrkdwn", "text": "*Triggered By:*\n$AUTHOR" }
+                  ]
+                },
+                $TEXT_BLOCK
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": { "type": "plain_text", "text": "$BUTTON_TEXT", "emoji": true },
+                      "style": "$BUTTON_STYLE",
+                      "url": "$BUTTON_URL"
+                    }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    { 
+                      "type": "mrkdwn", 
+                      "text": "Vonage Enterprise CI/CD Hub • <!date^${TIMESTAMP}^{date} at {time}|${TIMESTAMP}>" 
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+EOF
+)
         fi
 
-        # 4. Send to Slack
+        # 4. Final Send
         curl -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK"
