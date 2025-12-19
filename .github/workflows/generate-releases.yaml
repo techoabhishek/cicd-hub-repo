@@ -57,7 +57,7 @@ jobs:
         uses: techoabhishek/cicd-hub-repo/.github/actions/slack-notify@main
         with:
           status: 'success'
-          slack_webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          slack_webhook: ${{ secrets.SLACK_WEBHOOK }}
           
           # 🟢 ACTIVATE NEW LOOK
           mode: 'release'
