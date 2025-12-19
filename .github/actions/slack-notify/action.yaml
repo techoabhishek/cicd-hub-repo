@@ -110,7 +110,11 @@ runs:
                     { \"type\": \"mrkdwn\", \"text\": \"📍 *Target Environment:*\n$CAP_ENV\" },
                     { \"type\": \"mrkdwn\", \"text\": \"📦 *Repository:*\n<$REPO_URL|$GITHUB_REPOSITORY>\" }
                 ]},
-                { \"type\": \"context\", \"elements\": [ { \"type\": \"mrkdwn\", \"text\": \"🏷️ *Version:* $VERSION_TAG  •  🚀 *Released by:* $AUTHOR\" } ] },
+                { \"type\": \"context\", \"elements\": [ 
+                    { \"type\": \"mrkdwn\", \"text\": \"🏷️ *Version:* $VERSION_TAG\" },
+                    { \"type\": \"mrkdwn\", \"text\": \"          \" },
+                    { \"type\": \"mrkdwn\", \"text\": \"🚀 *Released by:* $AUTHOR\" } 
+                ]},
                 { \"type\": \"actions\", \"elements\": [ { \"type\": \"button\", \"text\": { \"type\": \"plain_text\", \"text\": \"$BUTTON_TEXT\" }, \"url\": \"$BUTTON_URL\" } ] }
               ]
             }]
