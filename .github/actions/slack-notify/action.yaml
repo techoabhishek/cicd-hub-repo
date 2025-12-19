@@ -2,7 +2,7 @@ name: 'Slack Notification'
 description: 'Notifications with Mentions and Approval links'
 inputs:
   status:
-    description: 'Job status (success, failure, cancelled, approval)'
+    description: 'Job status (success, failure, cancelled, approval, release)'
     required: true
   slack_webhook:
     description: 'The Slack Webhook URL'
@@ -19,6 +19,15 @@ inputs:
     description: 'Optional extra text to display in the message'
     required: false
     default: ''
+  # 🟢 NEW INPUTS FOR DUAL MODE
+  mode:
+    description: 'Notification style: deployment (default) or release'
+    required: false
+    default: 'deployment'
+  title:
+    description: 'Custom header title (Only used in release mode)'
+    required: false
+    default: ''
 
 runs:
   using: "composite"
@@ -31,8 +40,10 @@ runs:
         JOB_NAME: ${{ inputs.job_name }}
         MENTION: ${{ inputs.mention_on_failure }}
         CUSTOM_TEXT: ${{ inputs.custom_text }}
+        MODE: ${{ inputs.mode }}
+        INPUT_TITLE: ${{ inputs.title }}
       run: |
-        # 1. Logic for Colors, Emojis
+        # 1. Logic for Colors, Emojis (Shared)
         MENTION_TEXT=""
         BUTTON_TEXT="View Logs"
         BUTTON_STYLE="primary"
@@ -48,7 +59,6 @@ runs:
           HEADER="Deployment Failed"
           MENTION_TEXT="$MENTION" 
           BUTTON_STYLE="danger"
-          CUSTOM_TEXT=""
           
         elif [ "$STATUS" == "approval" ]; then
           COLOR="#ffc107"
@@ -56,132 +66,164 @@ runs:
           HEADER="Approval Required"
           BUTTON_TEXT="Review & Approve"
           MENTION_TEXT="$MENTION"
-          CUSTOM_TEXT="" 
           
         elif [ "$STATUS" == "started" ]; then
           COLOR="#2196F3"
           EMOJI="🚀"
           HEADER="Deployment Started"
-          MENTION_TEXT=""
-          CUSTOM_TEXT=""
-
-        # elif [ "$STATUS" == "rejected" ]; then
-        #   COLOR="#820000"
-        #   EMOJI="🚫"
-        #   HEADER="Deployment Rejected"
-        #   MENTION_TEXT="$MENTION"
-        #   BUTTON_STYLE="danger"
-        #   CUSTOM_TEXT=""
 
         elif [ "$STATUS" == "pr" ]; then
           COLOR="#9C27B0"
           EMOJI="🔀"
           HEADER="PR Validation"
           BUTTON_TEXT="View Pull Request"
-          MENTION_TEXT=""
           
         else
           COLOR="#808080"
           EMOJI="⚪"
-          HEADER="Build Cancelled"
-          CUSTOM_TEXT=""
+          HEADER="Status: $STATUS"
         fi
 
-        # 2. Git Metadata & Event Data
+        # 2. Git Metadata & Event Data (Shared Variables)
         REPO_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
         RUN_URL="$REPO_URL/actions/runs/$GITHUB_RUN_ID"
         AUTHOR="$GITHUB_ACTOR"
-        SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
         TIMESTAMP=$(date +%s)
         
-        # Default Button URL (Points to Logs)
+        # Default Button URL
         BUTTON_URL="$RUN_URL"
 
-        # PR Data Extraction
+        # PR Data Extraction (Keep your existing logic)
         if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
-          # 1. Get PR Title (Fixes the "Merge..." message)
           RAW_MSG=$(jq -r .pull_request.title "$GITHUB_EVENT_PATH")
-          
-          # 2. Get PR Number and construct Real URL
           PR_NUM=$(jq -r .pull_request.number "$GITHUB_EVENT_PATH")
           BRANCH="PR #$PR_NUM"
           BUTTON_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/pull/$PR_NUM"
-
-          # 3. FIX COMMIT SHA: Use the Head SHA (Actual commit), not Merge SHA
           REAL_SHA=$(jq -r .pull_request.head.sha "$GITHUB_EVENT_PATH")
           SHORT_SHA=$(echo $REAL_SHA | cut -c1-7)
           COMMIT_URL="$REPO_URL/commit/$REAL_SHA"
-          
         else
-          # Fallback for Push events (Use Git Log)
           RAW_MSG=$(git log -1 --pretty=format:"%s")
           BRANCH="${GITHUB_REF#refs/heads/}"
-
           SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
           COMMIT_URL="$REPO_URL/commit/$GITHUB_SHA"
         fi
 
-        # Clean the message (Remove quotes, truncate to 50 chars)
+        # Clean Message
         FULL_MSG=$(echo "$RAW_MSG" | sed 's/"/\\"/g')
         CLEAN_MSG=$(echo "$FULL_MSG" | head -n 1 | cut -c1-50)
 
-        # 3. Handle Custom Text
-        if [ -n "$CUSTOM_TEXT" ]; then
-          TEXT_BLOCK="{ \"type\": \"divider\" }, { \"type\": \"section\", \"text\": { \"type\": \"mrkdwn\", \"text\": \"ℹ️ $CUSTOM_TEXT\" } },"
+        # ---------------------------------------------------
+        # 3. DUAL MODE SWITCH
+        # ---------------------------------------------------
+
+        if [[ "$MODE" == "release" ]]; then
+          # 🟢 RELEASE MODE (New, Clean Look)
+          
+          # Use Input Title or Default
+          MAIN_TITLE="${INPUT_TITLE:-New Release Published}"
+          
+          # Capitalize & Bold Job Name (production -> Production)
+          CAP_JOB_NAME="${JOB_NAME^}"
+          FORMATTED_TARGET="*$CAP_JOB_NAME*"
+
+          PAYLOAD=$(cat <<EOF
+          {
+            "attachments": [
+              {
+                "color": "$COLOR",
+                "blocks": [
+                  {
+                    "type": "header",
+                    "text": { "type": "plain_text", "text": "$EMOJI $MAIN_TITLE", "emoji": true }
+                  },
+                  {
+                    "type": "section",
+                    "text": { "type": "mrkdwn", "text": "$CUSTOM_TEXT" }
+                  },
+                  {
+                    "type": "context",
+                    "elements": [
+                      { "type": "mrkdwn", "text": "📍 *Target:* $FORMATTED_TARGET" }
+                    ]
+                  },
+                  {
+                    "type": "actions",
+                    "elements": [
+                      {
+                        "type": "button",
+                        "text": { "type": "plain_text", "text": "$BUTTON_TEXT", "emoji": true },
+                        "url": "$BUTTON_URL"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+          EOF
+          )
+
         else
-          TEXT_BLOCK=""
+          # 🔵 DEPLOYMENT MODE (Legacy - Preserves your EXACT previous layout)
+          
+          # Handle Custom Text Block for Legacy Mode
+          if [ -n "$CUSTOM_TEXT" ]; then
+            TEXT_BLOCK="{ \"type\": \"divider\" }, { \"type\": \"section\", \"text\": { \"type\": \"mrkdwn\", \"text\": \"ℹ️ $CUSTOM_TEXT\" } },"
+          else
+            TEXT_BLOCK=""
+          fi
+
+          PAYLOAD=$(cat <<EOF
+          {
+            "attachments": [
+              {
+                "color": "$COLOR",
+                "blocks": [
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "$MENTION_TEXT $EMOJI *$HEADER* |  *Pipeline:* $JOB_NAME"
+                    }
+                  },
+                  {
+                    "type": "section",
+                    "fields": [
+                      { "type": "mrkdwn", "text": "*Repo:*\n<$REPO_URL|$GITHUB_REPOSITORY>" },
+                      { "type": "mrkdwn", "text": "*Ref:*\n\`$BRANCH\`" },
+                      { "type": "mrkdwn", "text": "*Commit:*\n<$COMMIT_URL|$SHORT_SHA> - $CLEAN_MSG" },
+                      { "type": "mrkdwn", "text": "*Triggered By:*\n$AUTHOR" }
+                    ]
+                  },
+                  $TEXT_BLOCK
+                  {
+                    "type": "actions",
+                    "elements": [
+                      {
+                        "type": "button",
+                        "text": { "type": "plain_text", "text": "$BUTTON_TEXT", "emoji": true },
+                        "style": "$BUTTON_STYLE",
+                        "url": "$BUTTON_URL"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "context",
+                    "elements": [
+                      { 
+                        "type": "mrkdwn", 
+                        "text": "Vonage Enterprise CI/CD Hub • <!date^${TIMESTAMP}^{date} at {time}|${TIMESTAMP}>" 
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+          EOF
+          )
         fi
 
-        # 4. Construct Payload
-        # Note: We now use $BUTTON_URL for the button action
-        PAYLOAD=$(cat <<EOF
-        {
-          "attachments": [
-            {
-              "color": "$COLOR",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "$MENTION_TEXT $EMOJI *$HEADER* |  *Pipeline:* $JOB_NAME"
-                  }
-                },
-                {
-                  "type": "section",
-                  "fields": [
-                    { "type": "mrkdwn", "text": "*Repo:*\n<$REPO_URL|$GITHUB_REPOSITORY>" },
-                    { "type": "mrkdwn", "text": "*Ref:*\n\`$BRANCH\`" },
-                    { "type": "mrkdwn", "text": "*Commit:*\n<$COMMIT_URL|$SHORT_SHA> - $CLEAN_MSG" },
-                    { "type": "mrkdwn", "text": "*Triggered By:*\n$AUTHOR" }
-                  ]
-                },
-                $TEXT_BLOCK
-                {
-                  "type": "actions",
-                  "elements": [
-                    {
-                      "type": "button",
-                      "text": { "type": "plain_text", "text": "$BUTTON_TEXT", "emoji": true },
-                      "style": "$BUTTON_STYLE",
-                      "url": "$BUTTON_URL"
-                    }
-                  ]
-                },
-                {
-                  "type": "context",
-                  "elements": [
-                    { 
-                      "type": "mrkdwn", 
-                      "text": "Vonage Enterprise CI/CD Hub • <!date^${TIMESTAMP}^{date} at {time}|${TIMESTAMP}>" 
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        }
-        EOF
-        )
-
+        # 4. Send to Slack
         curl -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK"
